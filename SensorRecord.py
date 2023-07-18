@@ -2,7 +2,8 @@ from mbientlab.metawear import MetaWear, libmetawear, parse_value
 from mbientlab.metawear.cbindings import *
 from mbientlab.warble import *
 import time
-
+from datetime import datetime
+import csv
 
 class IMU_READER():
     def __init__(self):
@@ -14,6 +15,20 @@ class IMU_READER():
         self.d1_found = 0
         self.d2_found = 0
         self.d3_found = 0
+        self.d1_a_file = "d1_accel_" + datetime.today().strftime('%Y_%m_%d')+".csv"
+        self.d1_g_file = "d1_gyro_" + datetime.today().strftime('%Y_%m_%d')+".csv"
+        self.d2_a_file = "d2_accel_" + datetime.today().strftime('%Y_%m_%d')+".csv"
+        self.d2_g_file = "d2_gyro_" + datetime.today().strftime('%Y_%m_%d')+".csv"
+
+        self.d1_acc_file = open(self.d1_a_file, "w", newline="\n")
+        self.d1_acc_writer = csv.writer(self.d1_acc_file)
+        self.d1_gyro_file = open(self.d1_g_file, "w", newline="\n")
+        self.d1_gyro_writer = csv.writer(self.d1_gyro_file)
+
+        self.d2_acc_file = open(self.d2_a_file, "w", newline="\n")
+        self.d2_acc_writer = csv.writer(self.d2_acc_file)
+        self.d2_gyro_file = open(self.d2_g_file, "w", newline="\n")
+        self.d2_gyro_writer = csv.writer(self.d2_gyro_file)
 
     def scan_result_printer(self, result):
         print("mac: %s" % result.mac)
@@ -39,25 +54,35 @@ class IMU_READER():
 
     def data_handler_accel_d1(self, ctx, data):
         print("data_handler_accel_d1")
-        print("%s" % (parse_value(data)))
-#      print("%s -> %s" % (self.d2.address, parse_value(data)))
+        value = parse_value(data)
+        print("%s" % value)
+        self.d1_acc_writer.writerow([time.time_ns(), value.x, value.y, value.z])
 
     def data_handler_accel_d2(self, ctx, data):
         print("data_handler_accel_d2")
-        print("%s" % (parse_value(data)))
+        value = parse_value(data)
+        print("%s" % value)
+        self.d2_acc_writer.writerow([time.time_ns(), value.x, value.y, value.z])
 
     #      print("%s -> %s" % (self.d2.address, parse_value(data)))
 
-    def data_handler_gyro(self, ctx, data):
-        print("data_handler_gyro")
-        print("%s" % (parse_value(data)))
-#       print("%s -> %s" % (self.d2.address, parse_value(data)))
+    def data_handler_gyro_d1(self, ctx, data):
+        print("data_handler_gyro_d1")
+        value = parse_value(data)
+        print("%s" % value)
+        self.d1_gyro_writer.writerow([time.time_ns(), value.x, value.y, value.z])
+
+    def data_handler_gyro_d2(self, ctx, data):
+        print("data_handler_gyro_d2")
+        value = parse_value(data)
+        print("%s" % value)
+        self.d2_gyro_writer.writerow([time.time_ns(), value.x, value.y, value.z])
 
     def stream_data_accel_d1(self):
         # Callback function pointer device 1
         callback_accel_d1 = FnVoid_VoidP_DataP(self.data_handler_accel_d1)
         # Setup the accelerometer sample frequency and range
-        libmetawear.mbl_mw_acc_set_odr(self.d1.board, 16000.0)
+        libmetawear.mbl_mw_acc_set_odr(self.d1.board, 100.0)
         libmetawear.mbl_mw_acc_set_range(self.d1.board, 4.0)
         libmetawear.mbl_mw_acc_write_acceleration_config(self.d1.board)
         # Get the accelerometer data signal
@@ -72,7 +97,7 @@ class IMU_READER():
         # Callback function pointer device 2
         callback_accel_d2 = FnVoid_VoidP_DataP(self.data_handler_accel_d2)
         # Setup the accelerometer sample frequency and range
-        libmetawear.mbl_mw_acc_set_odr(self.d2.board, 16000.0)
+        libmetawear.mbl_mw_acc_set_odr(self.d2.board, 100.0)
         libmetawear.mbl_mw_acc_set_range(self.d2.board, 4.0)
         libmetawear.mbl_mw_acc_write_acceleration_config(self.d2.board)
         # Get the accelerometer data signal
@@ -85,10 +110,10 @@ class IMU_READER():
 
 
 
-    def stream_data_gyro(self):
+    def stream_data_gyro_d1(self):
         #    print("Streaming Data")
         # Callback function pointer
-        callback_gyro_d1 = FnVoid_VoidP_DataP(self.data_handler_gyro)
+        callback_gyro_d1 = FnVoid_VoidP_DataP(self.data_handler_gyro_d1)
         gyro = libmetawear.mbl_mw_gyro_bmi160_get_rotation_data_signal(self.d1.board)
         # Set ODR to 200Hz
         libmetawear.mbl_mw_gyro_bmi160_set_odr(self.d1.board, 200)
@@ -100,6 +125,23 @@ class IMU_READER():
         libmetawear.mbl_mw_datasignal_subscribe(gyro, None, callback_gyro_d1)
         libmetawear.mbl_mw_gyro_bmi160_enable_rotation_sampling(self.d1.board)
         libmetawear.mbl_mw_gyro_bmi160_start(self.d1.board)
+
+
+    def stream_data_gyro_d2(self):
+        #    print("Streaming Data")
+        # Callback function pointer
+        callback_gyro_d2 = FnVoid_VoidP_DataP(self.data_handler_gyro_d2)
+        gyro = libmetawear.mbl_mw_gyro_bmi160_get_rotation_data_signal(self.d2.board)
+        # Set ODR to 200Hz
+        libmetawear.mbl_mw_gyro_bmi160_set_odr(self.d2.board, 200)
+        #Set data range to +/250 degrees per second
+        libmetawear.mbl_mw_gyro_bmi160_set_range(self.d2.board, 250)
+        # Write the changes to the sensor
+        libmetawear.mbl_mw_gyro_bmi160_write_config(self.d2.board)
+        # Subscribe to it
+        libmetawear.mbl_mw_datasignal_subscribe(gyro, None, callback_gyro_d2)
+        libmetawear.mbl_mw_gyro_bmi160_enable_rotation_sampling(self.d2.board)
+        libmetawear.mbl_mw_gyro_bmi160_start(self.d2.board)
 
 
     def scan(self):
@@ -137,10 +179,16 @@ class IMU_READER():
         self.stream_data()
 
     def stream_data(self):
+        self.d1_acc_writer.writerow(["Epoch Time", "D1A X", "D1A Y", "D1A Z"])
+        self.d1_gyro_writer.writerow(["Epoch Time", "D1G X", "D1G Y", "D1G Z"])
+        self.d2_acc_writer.writerow(["Epoch Time", "D2A X", "D2A Y", "D2A Z"])
+        self.d2_gyro_writer.writerow(["Epoch Time", "D2G X", "D2G Y", "D2G Z"])
         while True:
             self.stream_data_accel_d1()
             self.stream_data_accel_d2()
-            self.stream_data_gyro()
+            self.stream_data_gyro_d1()
+            self.stream_data_gyro_d2()
+
 
 
     def get_device_count(self):
